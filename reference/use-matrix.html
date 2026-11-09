@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USE matrix | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body>
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main class="wide">
+<h1>USE matrix</h1>
+<p>For every resource: utilization, saturation, errors. Start with errors and saturation.</p>
+<div class="scroll"><table><thead><tr><th>Resource</th><th>Utilization</th><th>Saturation</th><th>Errors</th></tr></thead><tbody>
+<tr><td>CPU</td><td><code>mpstat -P ALL 1</code>, <code>pidstat 1</code></td><td><code>vmstat 1</code> r above <code>nproc</code>; <code>/proc/pressure/cpu</code>; steal on VMs</td><td><code>dmesg</code> machine-check or thermal messages (rare)</td></tr>
+<tr><td>Memory</td><td><code>free -m</code> available; <code>ps aux --sort=-rss</code></td><td><code>vmstat</code> si/so; <code>/proc/pressure/memory</code></td><td><code>dmesg -T | grep -i oom</code>; exit status 137</td></tr>
+<tr><td>Storage I/O</td><td><code>iostat -xz 1</code>; <code>pidstat -d 1</code></td><td><code>await</code>, queue size; <code>vmstat</code> b; <code>/proc/pressure/io</code></td><td><code>dmesg</code> I/O errors, read-only remount</td></tr>
+<tr><td>Storage capacity</td><td><code>df -h</code>, <code>df -i</code>, <code>du -xh</code></td><td>Full or out of inodes; <code>lsof +L1</code> for hidden space</td><td>ENOSPC in application logs</td></tr>
+<tr><td>Network</td><td><code>sar -n DEV 1</code></td><td><code>ss -s</code>; Recv-Q on listeners; <code>nstat -az | grep -i retrans</code></td><td><code>ip -s link</code>; <code>sar -n ETCP 1</code></td></tr>
+</tbody></table></div>
+<p>Full Linux checklist: <a href="https://brendangregg.com/USEmethod/use-linux.html">Brendan Gregg, USE Method for Linux</a>. Taught in lessons <a href="../lessons/0002-four-resources-three-questions.html">2</a> and 4 to 7.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seeing inside a process | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0009">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 3: Processes and services. Lesson 9 of 12. About 14 minutes.</p><h1>Seeing inside a process</h1><p class="win"><strong>By the end you can:</strong> tell a stuck process from a busy one, spot a file-descriptor leak, and read a strace line.</p><div class="use-panel" data-lit=""></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r9a"><p class="q">What does a restart loop eventually trip in systemd?</p><ul class="opts"><li data-ok>The start rate limit</li><li>The kernel panic timer</li><li>The journal size cap</li><li>The cron scheduler daemon</li></ul><p class="why" hidden>Repeated fast restarts hit the start limit, after which the unit stays failed until reset-failed.</p></div></section>
+<p class="bridge">Lesson 8 told you whether a service is running and how it last ended. When it is running but stuck or wrong, you need to look inside the process. Linux makes that unusually easy, because the kernel exposes processes as files.</p>
+<h2>The process as a directory</h2>
+<p>Every process has a directory <code>/proc/PID</code>. A few entries earn their keep in a crisis:</p>
+<ul>
+<li><code>/proc/PID/status</code>: state, memory, threads.</li>
+<li><code>/proc/PID/fd/</code>: one entry per open file or socket.</li>
+<li><code>/proc/PID/limits</code>: resource limits, including <em>Max open files</em>.</li>
+<li><code>/proc/PID/cmdline</code>, <code>cwd</code>, <code>exe</code>: what it is and where it runs.</li>
+</ul>
+<pre class="term"><code>$ ps -o pid,stat,wchan:24,rss,cmd -p 4242
+$ ls /proc/4242/fd | wc -l
+$ grep 'open files' /proc/4242/limits
+$ lsof -p 4242 | head
+$ lsof -i :8080</code></pre>
+<p>The <code>STAT</code> letter matters. <code>R</code> is running or runnable, <code>S</code> is sleeping and can be interrupted, and <code>D</code> is uninterruptible sleep, usually waiting on I/O inside the kernel, which you cannot kill. A process stuck in <code>D</code> sends you back to lesson 6: check storage and network filesystems. <code>wchan</code> names the kernel function it is waiting in. A <code>Z</code> is a zombie, already dead, waiting for its parent to collect it.</p>
+<p>A classic production outage: a service slowly leaks file descriptors until it hits its limit, then fails with “too many open files”. Compare the count in <code>/proc/PID/fd</code> to the limit in <code>/proc/PID/limits</code>. For a systemd service the limit is set by <code>LimitNOFILE=</code>, not by your shell’s <code>ulimit</code>.</p>
+
+<h2>strace: ask the process what it is doing</h2>
+<pre class="mermaid">
+flowchart TD
+  H["Service is up but stuck or wrong"] --> S["ps -o stat,wchan -p PID"]
+  S --> Dq{"State D?"}
+  Dq -->|yes| K["Waiting in the kernel on I/O: iostat, dmesg, NFS"]
+  Dq -->|no| C{"Using CPU?"}
+  C -->|yes| P["Hot loop: perf top or strace -c"]
+  C -->|no| W["Blocked in a syscall: strace -f -p PID shows which"]
+</pre><pre class="term"><code>$ sudo strace -f -tt -T -p 4242 -e trace=network,file -o /tmp/s.txt   # Ctrl-C after ten seconds
+$ sudo strace -c -p 4242                                              # summary table of syscalls</code></pre>
+<p>Every interaction between a process and the outside world is a system call, and <code>strace</code> prints them with their return values. Read the failures. A line like <code>openat(..., "/etc/app/x.yaml") = -1 ENOENT</code> says a file is missing. <code>connect(...) = -1 ETIMEDOUT</code> says a dependency is unreachable. A process that is parked in <code>futex</code> or <code>poll</code> is waiting for something else to happen.</p>
+<p><code>strace</code> works by stopping the process at every syscall, so it can slow a busy process noticeably. Attach briefly, filter with <code>-e trace=</code>, and detach. Where installed, <code>perf</code> and <code>bpftrace</code> from the crisis-tools list trace with much less overhead.</p>
+<aside class="margin">Julia Evans’s zine <a href="https://wizardzines.com/zines/debugging/">Linux debugging tools you’ll love</a> is the gentlest introduction to strace and perf, written for people who have never used them.</aside><div class="predict"><p class="pq"><strong>Predict first.</strong> strace on a hung service shows repeated <code>openat(".../conf.d/x.yaml") = -1 ENOENT</code> followed by <code>nanosleep</code>. What is happening?</p><details><summary>Check your prediction</summary><div class="ans">The app expects a config file that does not exist and retries after a sleep. Fix is to supply the file or the path, not to restart. Note how the strace output answered in seconds what logs may never say.</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Inspect your own shell</h3>
+<ol><li><code>ls -l /proc/$$/fd</code> shows your shell’s open files; <code>grep 'open files' /proc/$$/limits</code> shows its limit.</li>
+<li><code>sleep 300 &amp;</code> then <code>ps -o pid,stat,wchan:24,cmd -p $!</code>. What is it waiting in?</li>
+<li><code>strace -f -e trace=openat cat /etc/hostname</code>. List every file it opened, including the libraries.</li>
+<li><code>strace -c ls /usr/bin &gt; /dev/null</code> and find the most frequent syscall. Then <code>kill %1</code>.</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l9q1"><p class="q">A process stays in state D. What is it waiting for?</p><ul class="opts"><li data-ok>Kernel-level disk or network I/O</li><li>A user keypress at terminal</li><li>Its parent process to exit</li><li>A scheduled timer to fire</li></ul><p class="why" hidden>D is uninterruptible sleep, typically blocked on I/O inside the kernel, such as a stuck disk or network filesystem.</p></div><div class="quiz" data-id="l9q2"><p class="q">Which file shows a running process’s open-files limit?</p><ul class="opts"><li>/proc/PID/status</li><li>/proc/PID/cmdline</li><li data-ok>/proc/PID/limits</li><li>/proc/PID/environ</li></ul><p class="why" hidden>/proc/PID/limits lists every resource limit for that process, including Max open files.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://wizardzines.com/zines/debugging/">Linux debugging tools you’ll love, by Julia Evans</a>. It shows strace, perf, and friends in a way that makes them feel approachable. Print it and keep it next to the keyboard.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/triage-flows.html">Triage flows (process inspection)</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0008-systemd-first-responder.html">Previous: Services: systemd is your first responder</a></span><span><a href="0010-shell-speed-slice-logs.html">Next: Shell speed: slice logs in seconds</a></span></nav>
+</main>
+</body>
+</html>

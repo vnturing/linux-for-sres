@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The first 60 seconds | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0003">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 1: Think before you type. Lesson 3 of 12. About 12 minutes.</p><h1>The first 60 seconds</h1><p class="win"><strong>By the end you can:</strong> run ten standard commands on a struggling server and place each result in the USE matrix.</p><div class="use-panel" data-lit="all"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r3a"><p class="q">Which signal counts discrete events such as dropped packets?</p><ul class="opts"><li>Utilization</li><li>Capacity</li><li data-ok>Errors</li><li>Saturation</li></ul><p class="why" hidden>Errors are counted events. Saturation is waiting work, and utilization is busy-ness.</p></div></section>
+<p class="bridge">Lesson 2 gave you four resources and three questions. Now you meet the ten commands that answer most of those questions in about a minute.</p>
+<h2>The checklist</h2>
+<p>The Netflix performance engineering team published the sequence they run when they log into a problem instance. It uses only standard tools. Here it is, with what each command answers.</p>
+<aside class="margin">Source: <a href="https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55">Linux Performance Analysis in 60,000 Milliseconds</a>, Netflix TechBlog. Several commands need the <code>sysstat</code> package.</aside><pre class="term"><code>$ uptime
+$ dmesg | tail
+$ vmstat 1
+$ mpstat -P ALL 1
+$ pidstat 1
+$ iostat -xz 1
+$ free -m
+$ sar -n DEV 1
+$ sar -n TCP,ETCP 1
+$ top</code></pre><pre class="mermaid">
+flowchart LR
+  subgraph one["Load and errors"]
+    A["uptime"] --> B["dmesg | tail"]
+  end
+  subgraph two["CPU"]
+    C["vmstat 1"] --> D1["mpstat -P ALL 1"] --> E["pidstat 1"]
+  end
+  subgraph three["Disk and memory"]
+    F["iostat -xz 1"] --> G["free -m"]
+  end
+  subgraph four["Network"]
+    H["sar -n DEV 1"] --> I["sar -n TCP,ETCP 1"]
+  end
+  B --> C
+  E --> F
+  G --> H
+  I --> J["top"]
+</pre>
+<div class="scroll"><table><thead><tr><th>Command</th><th>Answers</th><th>Look for</th></tr></thead><tbody>
+<tr><td><code>uptime</code></td><td>Is demand rising or falling?</td><td>1, 5, 15 minute load. A 1-minute figure far below the 15-minute one means you may have arrived after it passed.</td></tr>
+<tr><td><code>dmesg | tail</code></td><td>Errors, directly</td><td>OOM kills, TCP drops, disk errors. The Netflix team says not to skip it. Use <code>dmesg -T</code> for readable times; it may need sudo.</td></tr>
+<tr><td><code>vmstat 1</code></td><td>CPU, memory, swap, I/O at a glance</td><td><code>r</code> above CPU count; <code>si</code>/<code>so</code> nonzero; <code>wa</code> and <code>st</code> high.</td></tr>
+<tr><td><code>mpstat -P ALL 1</code></td><td>Per-CPU balance</td><td>One CPU pegged while others idle: a single-threaded bottleneck.</td></tr>
+<tr><td><code>pidstat 1</code></td><td>Which process</td><td>The rolling per-process CPU view; it does not clear the screen like <code>top</code>.</td></tr>
+<tr><td><code>iostat -xz 1</code></td><td>Storage I/O</td><td>Rising <code>await</code>, deep queues, heavy throughput.</td></tr>
+<tr><td><code>free -m</code></td><td>Memory</td><td>The <code>available</code> column, not <code>free</code>.</td></tr>
+<tr><td><code>sar -n DEV 1</code></td><td>Network throughput</td><td>Rx and Tx against the interface speed.</td></tr>
+<tr><td><code>sar -n TCP,ETCP 1</code></td><td>TCP health</td><td>Retransmits, new connections per second.</td></tr>
+<tr><td><code>top</code></td><td>Sanity check</td><td>Anything the others missed.</td></tr>
+</tbody></table></div>
+<p>Run each with a one-second interval and let it print a few lines before pressing Ctrl-C. The first line of <code>vmstat</code>, <code>mpstat</code>, and <code>iostat</code> shows averages since boot; read the lines after it.</p>
+
+<h2>Install the tools before the crisis</h2>
+<p>Gregg makes a pointed argument in his “Linux Crisis Tools” post: installing tools mid-outage fails in surprising ways. His made-up example has a package install that cannot even resolve repositories because of a broken apt configuration. Put the tools in your server images ahead of time. His list, with Ubuntu package names, is reproduced on the <a href="../reference/first-60-seconds.html">first-60-seconds reference</a>.</p>
+<aside class="margin"><a href="https://brendangregg.com/blog/2024-03-24/linux-crisis-tools.html">Linux Crisis Tools</a>, Brendan Gregg, March 2024.</aside><div class="predict"><p class="pq"><strong>Predict first.</strong> <code>uptime</code> shows load averages of 28, 24, and 3 on a 16-core host. What does that tell you, and what do you run next?</p><details><summary>Check your prediction</summary><div class="ans">Load is the 1-minute figure first: 28, well above 16 cores, and it has been climbing for over ten minutes since the 15-minute figure is only 3. The problem is recent and ongoing. Run <code>dmesg | tail</code> for errors, then <code>vmstat 1</code> to see whether <code>r</code> exceeds 16 (CPU) or <code>b</code> is high (blocked on I/O).</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Idle versus loaded</h3>
+<ol><li>Use a disposable Linux VM, not a shared or production machine. Install the tools: <code>sudo apt install sysstat procps</code> on Debian or Ubuntu.</li>
+<li>Run all ten commands while the machine is idle. Note a baseline value from each.</li>
+<li>In another terminal start load, for example <code>yes &gt; /dev/null &amp;</code> once per core. Run the ten again.</li>
+<li>Stop the load with <code>kill %1</code> (and the others). For each command write one line: did it change, and which USE cell does that fill?</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l3q1"><p class="q">uptime shows load 2.1 over one minute versus 20.4 over fifteen. What is likely?</p><ul class="opts"><li>The load is climbing right now.</li><li>The CPU hardware is failing soon.</li><li>Nothing can be concluded from load.</li><li data-ok>The problem has probably already passed.</li></ul><p class="why" hidden>The 1-minute figure is far below the 15-minute one, so load has fallen. You may have logged in after the event.</p></div><div class="quiz" data-id="l3q2"><p class="q">Why look at dmesg early in the sequence?</p><ul class="opts"><li>It lists every running process by CPU.</li><li>It measures per-device disk latency over time.</li><li data-ok>It can reveal OOM kills and drops.</li><li>It resets all counters for later comparisons.</li></ul><p class="why" hidden>Kernel messages carry direct evidence such as OOM kills and dropped connections, which are errors in USE terms.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55">Linux Performance Analysis in 60,000 Milliseconds</a>. It walks through each of the ten commands with real production output and explains how to read it. Read it with a terminal open.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/first-60-seconds.html">First-60-seconds cheat sheet</a></li><li><a href="../reference/use-matrix.html">USE matrix</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0002-four-resources-three-questions.html">Previous: Four resources, three questions</a></span><span><a href="0004-load-average-is-a-queue.html">Next: Load average is a queue, not a percentage</a></span></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Services: systemd is your first responder | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0008">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 3: Processes and services. Lesson 8 of 12. About 14 minutes.</p><h1>Services: systemd is your first responder</h1><p class="win"><strong>By the end you can:</strong> take a failing or flapping service from “it’s down” to an exit status and a log line in under two minutes.</p><div class="use-panel" data-lit=""></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r8a"><p class="q">Which tool shows who is listening on a TCP port?</p><ul class="opts"><li data-ok>ss -tlnp</li><li>df -i</li><li>iostat -x</li><li>dmesg -T</li></ul><p class="why" hidden>ss -tlnp lists listening TCP sockets with their processes, which answers “who owns this port”.</p></div></section>
+<p class="bridge">Lessons 4 to 7 read the machine. But the page is often phrased as “the service is down”. On almost every modern server, systemd is the thing that knows why.</p>
+<h2>A unit has a life cycle</h2>
+<p>systemd supervises each service as a <strong>unit</strong>. If you know its states, a status line stops being noise.</p>
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> inactive
+  inactive --> activating: start
+  activating --> active: ExecStart running
+  activating --> failed: exits or times out
+  active --> failed: crash or killed
+  failed --> activating: auto-restart
+  failed --> inactive: stop or reset-failed
+</pre>
+<h2>Two minutes of commands</h2>
+<pre class="term"><code>$ systemctl status nginx                    # state, main PID, exit status, last log lines, cgroup
+$ systemctl --failed                        # what else is broken?
+$ journalctl -u nginx -e                    # jump to the end of this unit's log
+$ journalctl -u nginx --since "15 min ago" -p warning
+$ systemctl cat nginx                       # unit file plus any drop-ins, as systemd sees it
+$ systemctl show -p NRestarts,ExecMainStatus nginx
+$ journalctl -k --since "15 min ago"        # kernel log, for OOM kills</code></pre>
+<p>Read the status block top to bottom. <code>Active:</code> says whether it is <em>failed</em>, <em>activating (auto-restart)</em>, or running. <code>Main PID</code> and the exit line say how it last ended. The final lines are the most recent journal entries. In a flapping service, those exit lines repeat.</p>
+<h3>Reading how it died</h3>
+<ul>
+<li><strong>status=137 or “killed, status=9/KILL”:</strong> something sent SIGKILL. Check <code>journalctl -k</code> for the OOM killer or a cgroup memory limit (<code>MemoryMax=</code>), then look for a human or a watchdog.</li>
+<li><strong>status=143:</strong> SIGTERM, so a normal stop request.</li>
+<li><strong>status=1 or another small number:</strong> the application exited with its own error. Its own log is next.</li>
+<li><strong>203/EXEC:</strong> systemd could not execute the binary. Wrong path, not executable, or a missing interpreter. The unit never started the program at all.</li>
+</ul>
+<p>A service that dies and restarts repeatedly will eventually trip systemd’s start rate limit and stay failed, with a message about restarting too quickly. After fixing the cause, clear it with <code>systemctl reset-failed</code> and start again. After editing a unit file, run <code>systemctl daemon-reload</code>. Prefer <code>systemctl edit</code> to change a unit through a drop-in, so package upgrades do not overwrite your change.</p>
+<aside class="margin">The reference for every directive, including <code>Restart=</code> and the exit-status handling, is <a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html">systemd.service(5)</a>.</aside><div class="predict"><p class="pq"><strong>Predict first.</strong> A service’s status repeats “Main process exited, code=killed, status=9/KILL” every two minutes. What do you check first?</p><details><summary>Check your prediction</summary><div class="ans">Something sends SIGKILL on a cycle. Check <code>journalctl -k</code> for OOM-killer lines and whether the unit has a <code>MemoryMax=</code>. If memory is not it, look for a watchdog, a timeout (<code>TimeoutStopSec</code>), or a deploy script that kills it.</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Make a flapping service</h3>
+<ol><li><code>sudo systemd-run --unit=flaky -p Restart=on-failure -p RestartSec=2 sh -c 'echo starting; sleep 3; exit 1'</code></li>
+<li>Run <code>systemctl status flaky</code> several times. Watch <em>activating (auto-restart)</em> alternate with <em>activating</em> and the restart count rise. In another terminal run <code>journalctl -u flaky -f</code>.</li>
+<li>Run <code>systemctl show -p NRestarts flaky</code>. Then <code>sudo systemctl stop flaky</code>.</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l8q1"><p class="q">Which command shows a unit file together with its drop-ins?</p><ul class="opts"><li>journalctl -u nginx</li><li>systemctl is-active nginx</li><li>systemctl status nginx</li><li data-ok>systemctl cat nginx</li></ul><p class="why" hidden>systemctl cat prints the unit file and every drop-in as systemd sees them. status shows the path but not the contents.</p></div><div class="quiz" data-id="l8q2"><p class="q">A service exits with status 137. What is most likely?</p><ul class="opts"><li data-ok>SIGKILL, often the OOM killer</li><li>A clean requested stop signal</li><li>A missing executable file path</li><li>An ordinary application error code</li></ul><p class="why" hidden>137 is 128 plus signal 9, so the process was force-killed, most often by the OOM killer or a memory limit.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://www.freedesktop.org/software/systemd/man/systemd.service.html">systemd.service(5)</a>. It defines how service units start, stop, restart, and report exit status. Search it for Restart= and exit status when something flaps.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/triage-flows.html">Triage flows (service lifecycle)</a></li><li><a href="../reference/glossary.html">Glossary</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0007-network-refused-timeout-or-slow.html">Previous: Network: refused, timed out, or slow?</a></span><span><a href="0009-seeing-inside-a-process.html">Next: Seeing inside a process</a></span></nav>
+</main>
+</body>
+</html>

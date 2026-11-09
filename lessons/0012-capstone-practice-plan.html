@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capstone: practice under the clock | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0012">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 4: Work under pressure. Lesson 12 of 12. About 15 minutes.</p><h1>Capstone: practice under the clock</h1><p class="win"><strong>By the end you can:</strong> run timed troubleshooting scenarios, log them in a reusable format, and schedule the review that makes the skills stick.</p><div class="use-panel" data-lit="all"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r12a"><p class="q">What should come before the first diagnostic command?</p><ul class="opts"><li data-ok>A short problem statement</li><li>A full system reboot</li><li>A kernel parameter change</li><li>A package upgrade run</li></ul><p class="why" hidden>A problem statement gives the investigation direction and keeps you from thrashing.</p></div></section>
+<p class="bridge">You have a method, four resources, ten first-minute commands, service and process tools, shell speed, and an incident order of operations. Reading does not make these automatic. Practice on a clock does.</p>
+<h2>Practice on real broken servers</h2>
+<p><a href="https://sadservers.com/">SadServers</a> gives you a real Linux server with a problem and a check that confirms when you have fixed it, much like coding-interview practice but for operations. Its scenarios range across Linux administration, web servers, databases, and containers, and many people use it to prepare for SRE interviews. Start with the easier Linux and Bash scenarios, and give yourself a time limit.</p>
+<h2>The log you keep for every scenario</h2>
+<p>Write a short entry each time. This is lesson 1’s problem statement, extended.</p>
+<pre class="term"><code>Scenario / date / time taken:
+Problem statement (symptom, baseline, change, scope):
+Hypotheses, in order:
+Resources checked and exonerated (U / S / E):
+Commands that mattered:
+Root cause:
+What I did not know and had to look up:
+What I would automate or pre-install:</code></pre>
+<h2>Spacing is the feature</h2>
+<p>Rereading feels productive but fades fast. Retrieval on a schedule is what builds durable skill. After each scenario, redo it from scratch after 3 days, then 7, then 21, without notes. Mix scenario types, so you practice choosing the right tool and not only using the last one you learned.</p>
+<pre class="mermaid">
+flowchart LR
+  A["Attempt a timed scenario"] --> B["Write the log: problem, exonerated, cause"]
+  B --> C["Look up every command you did not know"]
+  C --> Dq["Redo after 3 days, then 7, then 21"]
+  Dq --> A
+</pre>
+<h2>Where to learn from other people</h2>
+<p>Wisdom comes from outside your own practice. <a href="https://www.usenix.org/srecon">SREcon</a>, run by USENIX, is the field’s main conference series, and its talks are a window into how experienced teams think. <a href="https://sreweekly.com/">SRE Weekly</a> is a newsletter about keeping services available. Reading incident write-ups regularly builds the pattern library that makes the first minute faster.</p>
+<h2>A mixed check across the course</h2>
+<div class="quiz" data-id="l12q1"><p class="q">Which command’s output best reveals a deleted-but-open file?</p><ul class="opts"><li data-ok>lsof +L1</li><li>df -i</li><li>free -m</li><li>mpstat -A</li></ul><p class="why" hidden>lsof +L1 lists open files whose link count is below one, which are files deleted but still held open.</p></div><div class="quiz" data-id="l12q2"><p class="q">Load is high, r is low, and b is high. Which resource?</p><ul class="opts"><li>CPU run queue</li><li data-ok>Storage or I/O</li><li>Memory page cache</li><li>Network packet retransmits</li></ul><p class="why" hidden>Few runnable and many blocked tasks mean waiting on I/O rather than on the CPU.</p></div><div class="quiz" data-id="l12q3"><p class="q">A client gets an instant refusal. What does that imply?</p><ul class="opts"><li>Packets silently vanish en route</li><li data-ok>The host sent a reply</li><li>DNS returned an empty answer</li><li>TCP retransmits are rapidly climbing</li></ul><p class="why" hidden>Refusal is a reply: the host was reached, and no listener or a reject rule answered.</p></div><div class="quiz" data-id="l12q4"><p class="q">What belongs in the first four lines of an incident note?</p><ul class="opts"><li data-ok>Symptom, baseline, change, scope</li><li>Hostnames, versions, owners, budgets</li><li>Suspects, culprits, apologies, forecasts</li><li>Tools, flags, aliases, shortcuts</li></ul><p class="why" hidden>These four lines point you toward a resource and a hypothesis before the first command runs.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://sadservers.com/">SadServers</a>. Real broken Linux servers with automatic checks. It is the closest thing to on-call practice you can do at home.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/use-matrix.html">USE matrix</a></li><li><a href="../reference/first-60-seconds.html">First-60-seconds cheat sheet</a></li><li><a href="../reference/triage-flows.html">Triage flows</a></li><li><a href="../reference/glossary.html">Glossary</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0011-mitigate-first-diagnose-second.html">Previous: Mitigate first, diagnose second</a></span><span><a href="../index.html#map">Back to the course map</a></span></nav>
+</main>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Network: refused, timed out, or slow? | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0007">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 2: Read the four resources. Lesson 7 of 12. About 14 minutes.</p><h1>Network: refused, timed out, or slow?</h1><p class="win"><strong>By the end you can:</strong> classify a connectivity failure from one command’s behavior and pick the next check.</p><div class="use-panel" data-lit="net.u net.s net.e"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r7a"><p class="q">In iostat, which figure includes request queueing time?</p><ul class="opts"><li data-ok>await</li><li>rkB/s</li><li>tps</li><li>wkB/s</li></ul><p class="why" hidden>await is the average time a request takes including time spent queued, so rising await signals saturation.</p></div></section>
+<p class="bridge">Three resources done; the fourth is the network. Network debugging is a tangle unless you sort the symptom first, and one word does most of the sorting.</p>
+<h2>Sort the symptom</h2>
+<p>When a client cannot reach a service, ask what the connection attempt <em>did</em>:</p>
+<ul>
+<li><strong>Refused, instantly.</strong> The host is reachable and replied that nothing accepts connections there. Either no process is listening on that address and port, or a firewall rule actively rejects it.</li>
+<li><strong>Hangs, then times out.</strong> Packets are going into a void: a firewall silently dropping them, a missing route, a cloud security group, or the host being down.</li>
+<li><strong>Connects, but slow.</strong> Loss and retransmissions, slow DNS, or an overloaded application.</li>
+</ul>
+<pre class="mermaid">
+flowchart TD
+  C["Client cannot reach service"] --> N{"Does the name resolve?"}
+  N -->|no| DNS["DNS or resolver: getent hosts, dig, resolv.conf"]
+  N -->|yes| K{"What does connect do?"}
+  K -->|"refused, instantly"| R["Host answered, nothing accepted: ss -tlnp, bind address, REJECT rule"]
+  K -->|"hangs, then times out"| TO["Packets vanish: firewall DROP, route, security group, host down"]
+  K -->|"connects but slow"| SL["Loss, retransmits, DNS delays, busy app: nstat, sar -n TCP,ETCP, tcpdump"]
+</pre>
+<h2>Server side: is anything listening?</h2>
+<pre class="term"><code>$ ss -tlnp               # listening TCP sockets and their processes
+$ ss -s                  # socket summary
+$ ss -tan | awk 'NR&gt;1 {print $1}' | sort | uniq -c</code></pre>
+<p>The classic cause of “refused” is a service bound to <code>127.0.0.1</code> instead of <code>0.0.0.0</code>: it works on the box and nowhere else. <code>ss -tlnp</code> shows the bind address; <code>-p</code> needs root to show other users’ processes. In the state counts, many <code>SYN-SENT</code> mean outbound connects are not being answered, and a pile of <code>CLOSE-WAIT</code> means the application is not closing sockets. A large <code>TIME-WAIT</code> count alone is usually normal. For a listening socket, <code>Recv-Q</code> is the current accept queue; if it sits at the limit, the application is not accepting fast enough.</p>
+<p><code>ss</code> and <code>nstat</code> come from the <code>iproute2</code> package, which is on Gregg’s crisis tools list.</p>
+
+<h2>Client side: test the path</h2>
+<pre class="term"><code>$ getent hosts api.internal           # resolves the way applications do
+$ dig +short api.internal             # asks DNS directly
+$ curl -sv --connect-timeout 3 -o /dev/null http://api.internal:8080/
+$ ip -s link show eth0                # errors and drops per interface
+$ nstat -az | grep -i retrans         # kernel TCP retransmit counters
+$ sudo tcpdump -ni any port 8080 -c 20</code></pre>
+<p><code>getent</code> and <code>dig</code> can disagree, and the disagreement is a finding: <code>getent</code> follows the system’s name-service configuration (including <code>/etc/hosts</code>), while <code>dig</code> queries DNS only. When all else fails, <code>tcpdump</code> shows what is actually on the wire. Julia Evans’s zines on tcpdump and networking are the friendliest introduction.</p>
+<aside class="margin">Further reading: <a href="https://wizardzines.com/zines/debugging/">Linux debugging tools you’ll love</a> (Julia Evans) covers netstat, tcpdump, and wireshark.</aside><div class="predict"><p class="pq"><strong>Predict first.</strong> <code>curl</code> fails immediately with “Connection refused”, and <code>ss -tlnp</code> shows the service on <code>127.0.0.1:8080</code>. What is wrong?</p><details><summary>Check your prediction</summary><div class="ans">The service listens only on the loopback interface, so remote clients get refused. Change its bind address to 0.0.0.0 or the correct interface, and confirm with <code>ss -tlnp</code> again.</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Cause each symptom</h3>
+<ol><li><strong>Refused:</strong> <code>curl -sv localhost:9</code>. Nothing listens on port 9, so it fails at once. Note the message.</li>
+<li><strong>Timeout:</strong> <code>curl -sv --connect-timeout 3 10.255.255.1</code>. Depending on your network this times out or reports the network unreachable; note which, and how long it took.</li>
+<li><strong>Bind address:</strong> <code>python3 -m http.server 8080 --bind 127.0.0.1 &amp;</code>. Run <code>ss -tlnp</code>, then <code>curl</code> using the machine’s LAN address. Restart it without <code>--bind</code> and repeat.</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l7q1"><p class="q">An instant “connection refused” most likely means what?</p><ul class="opts"><li>Packets are silently dropped en route</li><li>The DNS name failed to resolve</li><li data-ok>Host replied; nothing accepted the connection</li><li>Retransmissions are overwhelming the whole link</li></ul><p class="why" hidden>A refusal is an answer: the host is up and reachable, but no listener accepted, or a rule rejected it.</p></div><div class="quiz" data-id="l7q2"><p class="q">A service listening only on 127.0.0.1 is reachable from…</p><ul class="opts"><li data-ok>Only that same machine</li><li>Every host on LAN</li><li>Any host on internet</li><li>Only hosts in VPC</li></ul><p class="why" hidden>Loopback addresses never leave the machine, so remote clients cannot connect.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://wizardzines.com/zines/debugging/">Linux debugging tools you’ll love, by Julia Evans</a>. A short, illustrated tour of netstat, tcpdump, wireshark, and more, written for people who find these tools intimidating.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/triage-flows.html">Triage flows (network)</a></li><li><a href="../reference/use-matrix.html">USE matrix</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0006-disk-full-slow-or-both.html">Previous: Disk: full, slow, or both</a></span><span><a href="0008-systemd-first-responder.html">Next: Services: systemd is your first responder</a></span></nav>
+</main>
+</body>
+</html>

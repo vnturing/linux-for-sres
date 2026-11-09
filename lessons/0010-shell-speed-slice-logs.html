@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shell speed: slice logs in seconds | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0010">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 4: Work under pressure. Lesson 10 of 12. About 15 minutes.</p><h1>Shell speed: slice logs in seconds</h1><p class="win"><strong>By the end you can:</strong> turn a raw log into a ranked answer with one pipeline, and move around a terminal without reaching for the mouse.</p><div class="use-panel" data-lit=""></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r10a"><p class="q">In /proc/PID/fd, each entry represents a…</p><ul class="opts"><li data-ok>Open file or socket</li><li>Running child process entry</li><li>Loaded kernel module image</li><li>Pending signal queue entry</li></ul><p class="why" hidden>Every open file, socket, or pipe appears as an entry under /proc/PID/fd.</p></div></section>
+<p class="bridge">Everything so far produced text: counters, logs, tables. Under pressure, the person who can slice that text fastest answers first. This lesson is about speed, and about not making things worse while you hurry.</p>
+<h2>One shape covers most questions</h2>
+<p>“Who is hammering us?” “Which path is failing?” “When did it start?” They are all the same pipeline: filter, extract a field, group, count, rank, trim.</p>
+<pre class="mermaid">
+flowchart LR
+  A["Filter: grep or an awk condition"] --> B["Extract: awk or cut a field"]
+  B --> C["Group: sort"]
+  C --> Dq["Count: uniq -c"]
+  Dq --> E["Rank: sort -rn"]
+  E --> F["Trim: head"]
+</pre><pre class="term"><code>$ awk '{print $1}' access.log | sort | uniq -c | sort -rn | head
+$ awk '$9 &gt;= 500 {print $4}' access.log | cut -c2-18 | sort | uniq -c
+$ journalctl -u api --since "1 hour ago" -o cat | sort | uniq -c | sort -rn | head
+$ ss -tan | awk 'NR&gt;1 {print $1}' | sort | uniq -c | sort -rn</code></pre>
+<p><strong>Why <code>sort</code> before <code>uniq -c</code>?</strong> <code>uniq</code> only collapses <em>adjacent</em> duplicates, so unsorted input gives meaningless counts. The final <code>sort -rn</code> ranks the counts, biggest first. In the second line, field 9 of a standard web-server access log is the status code, and field 4 is the timestamp; <code>cut -c2-18</code> trims it to the minute.</p>
+<h3>Keep the terminal under you</h3>
+<ul>
+<li><code>tail -F file</code> follows a log even across rotation. <code>less +F</code> does the same and lets you scroll back.</li>
+<li><code>watch -n1 'ss -s'</code> turns any command into a live display.</li>
+<li><code>Ctrl-R</code> searches history. <code>!!</code> repeats the last command, so <code>sudo !!</code> reruns it with sudo. <code>!$</code> is the last argument. <code>cd -</code> returns to the previous directory.</li>
+<li><code>Ctrl-A</code> and <code>Ctrl-E</code> jump to the line’s start and end; <code>Ctrl-W</code> deletes a word; <code>Ctrl-U</code> clears to the start.</li>
+<li>Run long work inside <code>tmux new -As incident</code>, so a dropped connection does not kill your session or your diagnosis.</li>
+</ul>
+<h3>Hurry safely</h3>
+<p>Reads are free; writes are not. Run the read-only version of a command first: <code>ls</code> the glob before <code>rm</code> it, <code>echo</code> a loop before you let it run. Send <code>kill -TERM</code> before <code>kill -9</code>. Never paste a destructive command you have not read, including one a teammate wrote in chat. Speed that causes a second outage is slower than care.</p>
+<div class="predict"><p class="pq"><strong>Predict first.</strong> What does <code>sort | uniq -c | sort -rn | head</code> do to a list of IP addresses, and what breaks if you drop the first <code>sort</code>?</p><details><summary>Check your prediction</summary><div class="ans">It counts occurrences of each address and shows the most frequent first. Without the first <code>sort</code>, identical addresses are not adjacent, so <code>uniq -c</code> produces many small counts instead of one total per address.</div></details></div>
+<h2>Drill with a real log</h2>
+<div class="drill"><h3>Find the noisy client and the bad minutes</h3>
+<p>Download <a href="../assets/sample-access.log">sample-access.log</a> (635 requests, standard access-log format). Answer from the shell, then open the answers.</p>
+<ol><li>Which client IP sent the most requests, and how many?</li>
+<li>Which minutes had the most responses with status 500 or above? List the top three.</li>
+<li>What one more command would you run to see what that client was requesting?</li></ol>
+<details><summary>Check your answers</summary>
+<p>1. <code>awk '{print $1}' sample-access.log | sort | uniq -c | sort -rn | head -3</code> ranks <code>203.0.113.9</code> first with 75 requests.</p>
+<p>2. <code>awk '$9 &gt;= 500 {print $4}' sample-access.log | cut -c2-18 | sort | uniq -c | sort -rn | head -3</code> gives [08/Nov/2026:10:17 at 38, [08/Nov/2026:10:15 at 34, and [08/Nov/2026:10:16 at 29.</p>
+<p>3. For example <code>grep '^203.0.113.9' sample-access.log | awk '{print $6, $7, $9}' | sort | uniq -c | sort -rn</code>. It shows the same address repeatedly posting to <code>/api/login</code> with errors.</p></details></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l10q1"><p class="q">Why must sort come before uniq -c?</p><ul class="opts"><li data-ok>uniq counts only adjacent duplicates</li><li>sort deletes lines uniq dislikes</li><li>uniq cannot read standard input</li><li>sort converts text to numbers</li></ul><p class="why" hidden>uniq compares neighboring lines only, so sorting first makes identical lines adjacent.</p></div><div class="quiz" data-id="l10q2"><p class="q">Which shortcut reruns the previous command using sudo?</p><ul class="opts"><li>sudo ^^</li><li data-ok>sudo !!</li><li>sudo $?</li><li>sudo !$</li></ul><p class="why" hidden>!! expands to the previous command line, so sudo !! reruns it with elevated privileges.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://nostarch.com/linuxtoolbox">Your Linux Toolbox, by Julia Evans</a>. A box set of illustrated zines, including Bite-Size Linux, that teaches shell fluency in short, visual pages.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/first-60-seconds.html">First-60-seconds cheat sheet</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0009-seeing-inside-a-process.html">Previous: Seeing inside a process</a></span><span><a href="0011-mitigate-first-diagnose-second.html">Next: Mitigate first, diagnose second</a></span></nav>
+</main>
+</body>
+</html>

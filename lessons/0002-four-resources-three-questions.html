@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Four resources, three questions | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0002">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 1: Think before you type. Lesson 2 of 12. About 10 minutes.</p><h1>Four resources, three questions</h1><p class="win"><strong>By the end you can:</strong> ask utilization, saturation, and errors of each of CPU, memory, disk, and network, and say which signal is which.</p><div class="use-panel" data-lit="all"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r2a"><p class="q">Which line belongs in a problem statement?</p><ul class="opts"><li>Which tool prints most?</li><li data-ok>What changed since yesterday?</li><li>Who owns this server?</li><li>Where is the manual?</li></ul><p class="why" hidden>Recent change is one of the strongest clues in any incident. The other lines are not diagnostic.</p></div></section>
+<p class="bridge">Lesson 1 gave you hypotheses and a habit. Hypotheses need somewhere to live. This lesson gives them four addresses and three questions each.</p>
+<h2>Resources</h2>
+<p>A server does its work with a small set of physical resources: <strong>CPU</strong>, <strong>memory</strong>, <strong>storage</strong> (both its speed and its capacity), and <strong>network</strong> interfaces. Nearly every “the server is slow” incident is one of these running out, or something misbehaving because one did.</p>
+<h2>Three questions per resource</h2>
+<p>Brendan Gregg’s USE method fits in one sentence: for every resource, check <strong>utilization</strong>, <strong>saturation</strong>, and <strong>errors</strong>.</p>
+<ul>
+<li><strong>Utilization:</strong> how busy is the resource, as a fraction of its capacity, over an interval?</li>
+<li><strong>Saturation:</strong> is there more work waiting than the resource can serve? Usually a queue length or time spent waiting.</li>
+<li><strong>Errors:</strong> are discrete failure events being counted: dropped packets, I/O failures, killed processes?</li>
+</ul>
+<aside class="margin">Source for the one-sentence form: <a href="https://freebsdfoundation.org/wp-content/uploads/2014/07/The-USE-Method.pdf">The USE Method, FreeBSD Journal</a> (Gregg). A full Linux checklist is at <a href="https://brendangregg.com/USEmethod/use-linux.html">brendangregg.com/USEmethod/use-linux.html</a>.</aside>
+<p>The method works because it starts from questions, not tools. You will not overlook disk errors just because you happen to be fluent in a CPU tool.</p>
+<div class="scroll"><table><thead><tr><th>Resource</th><th>Utilization</th><th>Saturation</th><th>Errors</th></tr></thead><tbody>
+<tr><td>CPU</td><td><code>mpstat</code>: user plus system percent</td><td>Run queue longer than CPU count; PSI cpu</td><td>Rare; machine checks in <code>dmesg</code></td></tr>
+<tr><td>Memory</td><td><code>free</code>: how much is really used</td><td>Swapping, reclaim stalls; PSI memory</td><td>OOM killer events in <code>dmesg</code></td></tr>
+<tr><td>Storage I/O</td><td><code>iostat -x</code>: device busy</td><td>Queue depth, rising <code>await</code>; PSI io</td><td>I/O errors in <code>dmesg</code></td></tr>
+<tr><td>Storage capacity</td><td><code>df -h</code>, <code>df -i</code></td><td>Full: writes start failing</td><td>ENOSPC and read-only remounts</td></tr>
+<tr><td>Network</td><td><code>sar -n DEV</code> versus link speed</td><td>Drops, overruns, retransmits</td><td><code>ip -s link</code> errors</td></tr>
+</tbody></table></div>
+<p>You do not need to memorize the table now. Lessons 4 to 7 fill each row in properly, and the <a href="../reference/use-matrix.html">USE matrix reference</a> keeps it on one page.</p>
+
+<h2>Why errors and saturation come first</h2>
+<p>Netflix’s first-minute guidance is to look for errors and saturation first, because both are easy to interpret, and then at utilization. A nonzero error count is a finding. A growing queue is a finding. A utilization figure of 60 percent, by contrast, means very little until you know what the resource was asked to do.</p>
+<p>Utilization is also easy to misread, because it is an average over an interval. A resource can average 45 percent over a minute and still sit at 100 percent in short bursts that make requests queue. Saturation is what exposes that.</p>
+<pre class="mermaid">
+flowchart TD
+  P["Symptom"] --> R["Pick a resource: CPU, memory, disk, network"]
+  R --> E{"Errors?"}
+  E -->|yes| X["Fault found: chase the error source"]
+  E -->|no| S{"Saturated?"}
+  S -->|yes| Y["Bottleneck suspect: find who is queued"]
+  S -->|no| U{"Utilization high?"}
+  U -->|yes| Z["Near the limit: watch for saturation"]
+  U -->|no| O["Resource exonerated: next resource"]
+  O --> R
+</pre>
+<div class="predict"><p class="pq"><strong>Predict first.</strong> A CPU averages 45 percent utilization over a minute, but users report stalls. Which signals could still show trouble?</p><details><summary>Check your prediction</summary><div class="ans">Saturation: a run queue that spikes above the CPU count, or PSI cpu pressure. Also look per CPU, since one core pinned at 100 percent (a single-threaded bottleneck) hides inside a low average, and steal time if this is a VM.</div></details></div>
+<h2>Drill on paper</h2>
+<div class="drill"><h3>Fill the matrix from memory</h3>
+<p>Draw the 5-row, 3-column grid empty. Fill in one concrete thing you would look at for each cell, without peeking. Then compare with the <a href="../reference/use-matrix.html">reference</a>. The cells you could not fill are your study list.</p></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l2q1"><p class="q">A run queue longer than the CPU count is which USE signal?</p><ul class="opts"><li>Utilization</li><li data-ok>Saturation</li><li>Errors</li><li>Throughput</li></ul><p class="why" hidden>Work is waiting for a resource that cannot serve it yet. That is saturation, shown as a queue.</p></div><div class="quiz" data-id="l2q2"><p class="q">Writes fail with ENOSPC while the disk is only 40 percent busy. Which resource is exhausted?</p><ul class="opts"><li>Network packet loss</li><li>CPU scheduler delay</li><li>Memory page reclaim</li><li data-ok>Storage capacity exhausted</li></ul><p class="why" hidden>Busy-ness of the device and free capacity are separate resources. Capacity ran out even though the device had spare time.</p></div><div class="quiz" data-id="l2q3"><p class="q">Why read errors and saturation before utilization?</p><ul class="opts"><li>Utilization numbers are unreliable on every kernel.</li><li>Errors and saturation never need any tooling.</li><li data-ok>They are easy to interpret and decisive.</li><li>Utilization can only be measured after reboots.</li></ul><p class="why" hidden>Errors and saturation are usually direct evidence. Utilization needs context before it means anything.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://brendangregg.com/USEmethod/use-linux.html">Brendan Gregg’s USE Method checklist for Linux</a>. It lists, resource by resource, which Linux metrics answer each of the three questions. Skim it now; it will make more sense after lesson 7.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/use-matrix.html">USE matrix</a></li><li><a href="../reference/glossary.html">Glossary</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0001-start-with-the-question.html">Previous: Start with the question, not the tool</a></span><span><a href="0003-first-60-seconds.html">Next: The first 60 seconds</a></span></nav>
+</main>
+</body>
+</html>

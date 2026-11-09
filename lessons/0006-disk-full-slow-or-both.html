@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disk: full, slow, or both | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0006">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 2: Read the four resources. Lesson 6 of 12. About 14 minutes.</p><h1>Disk: full, slow, or both</h1><p class="win"><strong>By the end you can:</strong> diagnose “no space left on device” including the deleted-but-open-file case, and read iostat for a slow disk.</p><div class="use-panel" data-lit="disk.u disk.s disk.e"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r6a"><p class="q">MemAvailable estimates memory usable without…</p><ul class="opts"><li data-ok>Swapping</li><li>Rebooting</li><li>Compiling</li><li>Mounting</li></ul><p class="why" hidden>It estimates what new applications can use without pushing the system into swap.</p></div></section>
+<p class="bridge">Lesson 4 left a trail: blocked tasks usually mean slow storage. Storage is actually two resources, and mixing them up wastes the most time.</p>
+<h2>Capacity and speed are different resources</h2>
+<p><strong>Capacity</strong> is how much room is left. Its failure is loud: writes fail with ENOSPC, and databases and loggers fall over. <strong>I/O speed</strong> is how quickly the device serves requests. Its failure is quiet: everything just gets slow. Treat them as two rows in your USE matrix.</p>
+
+<h2>Capacity: three checks, in order</h2>
+<pre class="mermaid">
+flowchart TD
+  W["No space left on device"] --> Dq{"df -h shows 100 percent?"}
+  Dq -->|no| I{"df -i shows 100 percent inodes?"}
+  I -->|yes| I2["Too many small files: find the directory"]
+  I -->|no| Q["Check quotas, a read-only remount, or a different mount"]
+  Dq -->|yes| U{"Does du -xh find the space?"}
+  U -->|yes| T["Rotate or trim the big files"]
+  U -->|no| O["lsof +L1: deleted files still held open"]
+</pre><pre class="term"><code>$ df -h                      # blocks: which filesystem is full?
+$ df -i                      # inodes: out of files, not bytes?
+$ du -xh --max-depth=1 /var 2&gt;/dev/null | sort -h | tail
+$ lsof +L1                   # deleted files still held open
+$ journalctl --disk-usage    # the journal itself can be the culprit</code></pre>
+<p>Two traps catch nearly everyone once. First, a filesystem can run out of <strong>inodes</strong> while <code>df -h</code> shows plenty of free bytes, usually from millions of tiny files, and the error message is the same. Second, a process can keep writing to a file that someone deleted. The name is gone, so <code>du</code> cannot see it, but the space stays allocated until the process closes it or exits. When <code>df</code> says full and <code>du</code> cannot account for it, run <code>lsof +L1</code>, which lists open files whose link count is below one. Restarting the holder, or truncating through its file descriptor under <code>/proc</code>, releases the space; know the consequences before choosing.</p>
+
+<h2>Speed: reading iostat</h2>
+<pre class="term"><code>$ iostat -xz 1</code></pre>
+<p>Focus on three things per device: <code>await</code> (average time per request, including queueing; in newer sysstat this is split into <code>r_await</code> and <code>w_await</code>), the average queue size (<code>aqu-sz</code>, called <code>avgqu-sz</code> in older versions), and throughput. Compare latency against what the device should deliver. Be careful with <code>%util</code>: per the <code>iostat</code> man page, near 100 percent means saturation only for devices that serve requests one at a time; modern SSDs and RAID arrays serve requests in parallel, so a high figure there does not by itself mean a limit has been reached. For a direct signal, read <code>/proc/pressure/io</code>. Errors live in <code>dmesg</code>: I/O errors, and a filesystem remounted read-only.</p>
+<p>To find who is doing the I/O, <code>pidstat -d 1</code> shows per-process reads and writes.</p>
+<aside class="margin">Netflix’s post covers reading <code>iostat</code> output on a real production host: <a href="https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55">Linux Performance Analysis in 60,000 Milliseconds</a>.</aside><div class="predict"><p class="pq"><strong>Predict first.</strong> <code>df -h</code> shows /var at 100 percent, but <code>du -xh /var</code> adds up to about 40 percent. What is happening and what finds it?</p><details><summary>Check your prediction</summary><div class="ans">A deleted file is still held open by a running process, so its space is allocated but invisible to <code>du</code>. <code>lsof +L1</code> lists it along with the process. Often it is a log file removed without restarting the logger.</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Create the invisible file</h3>
+<ol><li><code>dd if=/dev/zero of=/var/tmp/big bs=1M count=500</code></li>
+<li><code>tail -f /var/tmp/big &gt; /dev/null &amp;</code> then <code>rm /var/tmp/big</code></li>
+<li>Compare <code>df -h /var/tmp</code> (space still used) with <code>du -sh /var/tmp</code> (not counted). Run <code>lsof +L1</code> and find the <code>tail</code> process.</li>
+<li><code>kill %1</code> and run <code>df -h /var/tmp</code> again: the space returns.</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l6q1"><p class="q">df reports a full filesystem but du totals far lower. Likeliest cause?</p><ul class="opts"><li data-ok>Deleted files held open</li><li>A failing storage controller</li><li>Corrupted inode tables everywhere</li><li>Misreported kernel block sizes</li></ul><p class="why" hidden>Space from deleted files is not freed until the last open handle closes, and du cannot see unlinked files.</p></div><div class="quiz" data-id="l6q2"><p class="q">Writes fail with ENOSPC but df -h shows free space. What next?</p><ul class="opts"><li>Reboot the host</li><li data-ok>Run df -i</li><li>Drop all caches</li><li>Resize the swap</li></ul><p class="why" hidden>Inode exhaustion gives the same error with free bytes. df -i shows inode usage.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://brendangregg.com/USEmethod/use-linux.html">Brendan Gregg’s USE Method checklist for Linux</a>. Its storage rows list the capacity, device, and controller metrics for Linux and where to read each.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/triage-flows.html">Triage flows (disk)</a></li><li><a href="../reference/use-matrix.html">USE matrix</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0005-memory-free-is-the-wrong-number.html">Previous: Memory: free is the wrong number</a></span><span><a href="0007-network-refused-timeout-or-slow.html">Next: Network: refused, timed out, or slow?</a></span></nav>
+</main>
+</body>
+</html>

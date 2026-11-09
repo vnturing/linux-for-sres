@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start with the question, not the tool | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0001">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 1: Think before you type. Lesson 1 of 12. About 8 minutes.</p><h1>Start with the question, not the tool</h1><p class="win"><strong>By the end you can:</strong> write a four-line problem statement and a ranked hypothesis list before you touch the keyboard.</p><div class="use-panel" data-lit=""></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header>
+<p class="bridge">This is the first lesson, so there is nothing to recall yet. Everything later hangs off the habit built here.</p>
+<h2>The 3 a.m. page</h2>
+<p>A page fires: <em>checkout API p99 latency is 4 seconds on api-7</em>. You have a shell on the box. Most engineers type <code>top</code>. That is not wrong, only early. A command is an answer, and you have not yet decided which question you are asking.</p>
+<p>Under pressure, the failure is rarely ignorance of a tool. It is thrashing: running commands because they exist, collecting numbers nobody asked for, and losing the thread. The fix is to put a short, boring ritual in front of the first command.</p>
+
+<h2>Four lines before the first command</h2>
+<p>Write these down in a scratch file or the incident channel. It takes about a minute and it pays for itself.</p>
+<table><thead><tr><th>Line</th><th>Question it forces</th><th>Example</th></tr></thead><tbody>
+<tr><td>Symptom</td><td>What exactly is wrong, measured how?</td><td>p99 latency 4 s, up from 300 ms</td></tr>
+<tr><td>Baseline</td><td>Has this ever been fine?</td><td>Fine until about 14:05 today</td></tr>
+<tr><td>Change</td><td>What changed recently: code, config, load, hardware?</td><td>Deploy at 14:03, traffic up 20 percent</td></tr>
+<tr><td>Scope</td><td>One host, one service, or everything?</td><td>api-7 only; api-3 looks normal</td></tr>
+</tbody></table>
+<aside class="margin">The first three questions follow Brendan Gregg’s Problem Statement Method, listed in his <a href="https://www.brendangregg.com/Slides/Velocity2015_LinuxPerfTools.pdf">Linux Performance Tools tutorial</a>. Scope is our addition.</aside>
+<p>Notice what this already does. “Only api-7” suggests something local to the host. “After the deploy” suggests code or config. You have not run a command and you already have a direction.</p>
+
+<h2>A loop, not a list</h2>
+<p>Diagnosis is a loop. You hold a few ranked hypotheses, run the <strong>cheapest command that tells two of them apart</strong>, and let the result narrow the list. Google’s SRE book frames troubleshooting the same way: as a process you can learn and teach, not a gift.</p>
+<pre class="mermaid">
+flowchart LR
+  S["Symptom: what, since when, who is affected"] --> H["Rank two or three hypotheses"]
+  H --> C["Run the cheapest command that tells them apart"]
+  C --> Dq{"Did it rule something in or out?"}
+  Dq -->|yes| N["Narrow the list, or mitigate"]
+  Dq -->|no| H
+  N --> H
+</pre>
+<p>One more idea belongs in the loop from day one: <strong>exonerate</strong>. When you check a resource and find it healthy, say so out loud. Ruling something out is progress, because it shrinks the search. Netflix’s performance team makes the same point in their first-minute checklist, which we meet in lesson 3.</p>
+
+<div class="predict"><p class="pq"><strong>Predict first.</strong> Latency rose right after a 14:03 deploy. Name two cheap observations that would separate “the new code is slow” from “this host is overloaded”.</p><details><summary>Check your prediction</summary><div class="ans">Compare with a host that has the old code and similar traffic (scope), and check whether the host’s CPU, memory, disk, or network show strain at all (resources). If other hosts on the new code are slow too, suspect the code. If only this host is strained, suspect the host or its traffic share.</div></details></div>
+<h2>Drill on paper</h2>
+<div class="drill"><h3>Write it before you run it</h3>
+<ol><li>Take the 3 a.m. page above, or a real incident you remember.</li>
+<li>Fill in Symptom, Baseline, Change, Scope in four short lines.</li>
+<li>Write two or three hypotheses, most likely first.</li>
+<li>For the top one, write the single cheapest check that would confirm or kill it. Do not run anything yet.</li></ol>
+<p>Keep this note. In lesson 12 you will turn it into a template.</p></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l1q1"><p class="q">You’re paged for slow responses on api-7. What comes before the first command?</p><ul class="opts"><li>Open top and carefully scan every process.</li><li data-ok>State symptom, baseline, recent changes, and scope.</li><li>Restart the service, then investigate the cause.</li><li>Install every available profiling tool before proceeding.</li></ul><p class="why" hidden>A short problem statement points you toward a resource and a hypothesis. Opening top first is not wrong, just unguided, and restarting first can destroy the evidence.</p></div><div class="quiz" data-id="l1q2"><p class="q">What does exonerating a resource buy you?</p><ul class="opts"><li>Proof the application code is faulty.</li><li>Permission to skip all remaining checks.</li><li data-ok>A shorter list of remaining suspects.</li><li>A faster kernel under heavier load.</li></ul><p class="why" hidden>Each resource you rule out shrinks the search space and tells you where the next command should point.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://sre.google/sre-book/effective-troubleshooting/">Chapter 12, Effective Troubleshooting, in Google’s SRE book</a>. It treats troubleshooting as a learnable, teachable process rather than a talent, which is the premise of this whole course.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/triage-flows.html">Triage flows: all the diagrams in one printable page</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="../index.html#map">Course map</a></span><span><a href="0002-four-resources-three-questions.html">Next: Four resources, three questions</a></span></nav>
+</main>
+</body>
+</html>

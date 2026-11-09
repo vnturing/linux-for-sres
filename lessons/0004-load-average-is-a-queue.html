@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Load average is a queue, not a percentage | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0004">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 2: Read the four resources. Lesson 4 of 12. About 12 minutes.</p><h1>Load average is a queue, not a percentage</h1><p class="win"><strong>By the end you can:</strong> read a load average, decide whether the CPU, the disk, or a hypervisor is behind it, and prove it with two commands.</p><div class="use-panel" data-lit="cpu.u cpu.s"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r4a"><p class="q">Which of the ten commands prints per-CPU time breakdowns?</p><ul class="opts"><li>vmstat</li><li>iostat</li><li>pidstat</li><li data-ok>mpstat</li></ul><p class="why" hidden>mpstat -P ALL 1 shows each CPU separately, which exposes imbalance that averages hide.</p></div></section>
+<p class="bridge">In lesson 3, <code>uptime</code> gave you three numbers and we said “worth a quick look only”. Here is why, and what to run to turn those numbers into a diagnosis.</p>
+<h2>What the number counts</h2>
+<p>The load average is an exponentially damped moving average, over 1, 5, and 15 minutes, of the number of tasks that want to run. On Linux that includes tasks that are runnable on the CPU queue <em>and</em> tasks blocked in uninterruptible sleep, usually waiting on disk I/O. So a load of 30 can mean thirty things fighting for CPU, or thirty things stuck waiting on a slow disk. The number alone cannot tell you which.</p>
+<aside class="margin">Sources: the Netflix checklist from lesson 3, and <a href="http://www.brendangregg.com/blog/2017-08-08/linux-load-averages.html">Linux Load Averages: Solving the Mystery</a> by Brendan Gregg, which traces why Linux includes uninterruptible tasks.</aside>
+<p>Compare the figure to the number of CPUs (<code>nproc</code>). Load 8 on an 8-CPU machine means roughly one task per CPU. Load 8 on 2 CPUs means a queue.</p>
+
+<h2>Splitting the ambiguity</h2>
+<p>Three commands you already know separate the causes:</p>
+<ul>
+<li><code>vmstat 1</code>: the <code>r</code> column is tasks waiting for or using CPU; compare it to the CPU count. The <code>b</code> column is tasks blocked in uninterruptible sleep. The <code>wa</code> and <code>st</code> columns are I/O wait and steal.</li>
+<li><code>mpstat -P ALL 1</code>: per-CPU view. One CPU at 100 percent and the rest idle is a single-threaded bottleneck that average utilization hides.</li>
+<li><code>pidstat 1</code>: which processes are consuming the CPU.</li>
+</ul>
+<p><strong>Steal</strong> matters on VMs and cloud instances: it is time the hypervisor gave your CPU to someone else. High steal means your VM is the problem, not your software.</p>
+<pre class="mermaid">
+flowchart TD
+  L["Load average high versus nproc"] --> V["vmstat 1: compare r and b"]
+  V --> R{"r above the CPU count?"}
+  R -->|yes| C["CPU saturated: pidstat 1 shows who"]
+  R -->|no| B{"b high or iowait high?"}
+  B -->|yes| D["Tasks stuck in I/O: check disk and NFS"]
+  B -->|no| S{"steal high on a VM?"}
+  S -->|yes| N["Hypervisor is taking CPU: resize or move"]
+  S -->|no| W["Load was brief: check history with sar -q"]
+</pre>
+<h2>Pressure Stall Information</h2>
+<p>Modern kernels expose a direct saturation signal. Read <code>/proc/pressure/cpu</code>:</p>
+<pre class="term"><code>$ cat /proc/pressure/cpu
+some avg10=30.27 avg60=29.97 avg300=18.80 total=1620253162</code></pre>
+<p>The <code>some</code> line is the share of time in which at least one task was stalled waiting for CPU, averaged over the last 10, 60, and 300 seconds. That is saturation measured directly, with no guessing from load. The same interface exists for memory and I/O (<code>/proc/pressure/memory</code>, <code>/proc/pressure/io</code>), and per cgroup. If the files are missing, your kernel may not have PSI enabled.</p>
+<aside class="margin">Source: <a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">PSI: Pressure Stall Information</a>, kernel documentation.</aside><div class="predict"><p class="pq"><strong>Predict first.</strong> <code>vmstat</code> shows <code>r=2</code> and <code>b=14</code> on a 4-CPU host with load 16. Is the CPU the problem?</p><details><summary>Check your prediction</summary><div class="ans">No. Only two tasks want CPU, but fourteen are blocked in uninterruptible sleep. The load is I/O wait. Look at <code>iostat -xz 1</code>, <code>df -h</code>, and whether a network filesystem is stuck. That is lesson 6.</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Make each cause on purpose</h3>
+<ol><li>Run <code>nproc</code>. In one terminal run <code>vmstat 1</code>; in another <code>watch -n1 cat /proc/pressure/cpu</code>.</li>
+<li>Start <code>nproc * 2</code> copies of <code>yes &gt; /dev/null &amp;</code>. Watch <code>r</code> rise above the CPU count and the PSI <code>some</code> value climb. Kill them.</li>
+<li>Now create I/O wait: <code>dd if=/dev/zero of=/var/tmp/f bs=1M count=4096 oflag=direct</code>. Use <code>/var/tmp</code>, because <code>/tmp</code> is often memory-backed. Watch <code>b</code> and <code>wa</code>, and <code>/proc/pressure/io</code>. Then <code>rm /var/tmp/f</code>.</li>
+<li>Write down how <code>r</code>, <code>b</code>, and the two PSI files differed between the two experiments.</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l4q1"><p class="q">On Linux, load average counts tasks that are…</p><ul class="opts"><li>Only running on a CPU</li><li>Only waiting for network packets</li><li data-ok>Runnable or in uninterruptible sleep</li><li>Using over half a CPU</li></ul><p class="why" hidden>Linux counts runnable tasks and tasks in uninterruptible sleep, which is why disk waits raise load.</p></div><div class="quiz" data-id="l4q2"><p class="q">vmstat shows r=2 and b=14 on four CPUs. Where next?</p><ul class="opts"><li>Process CPU hogs</li><li data-ok>Disk and NFS</li><li>Network retransmits now</li><li>Kernel scheduler config</li></ul><p class="why" hidden>Few runnable tasks and many blocked ones point at I/O, so check disk and network filesystems.</p></div><div class="quiz" data-id="l4q3"><p class="q">PSI cpu shows some avg10=30.00. What does that mean?</p><ul class="opts"><li data-ok>Some task waited for CPU 30% of ten seconds</li><li>Thirty percent of all CPU cores were sitting idle</li><li>CPU usage averaged 30% over the last ten seconds</li><li>Load average equals 30 across every online core now</li></ul><p class="why" hidden>The some line is the percentage of time at least one task was stalled waiting for the CPU, averaged over the window.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="http://www.brendangregg.com/blog/2017-08-08/linux-load-averages.html">Linux Load Averages: Solving the Mystery</a>. It explains the history behind counting uninterruptible tasks and shows why the figure is better read as demand than as CPU use.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/triage-flows.html">Triage flows</a></li><li><a href="../reference/use-matrix.html">USE matrix</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0003-first-60-seconds.html">Previous: The first 60 seconds</a></span><span><a href="0005-memory-free-is-the-wrong-number.html">Next: Memory: free is the wrong number</a></span></nav>
+</main>
+</body>
+</html>

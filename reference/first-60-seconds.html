@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First 60 seconds | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body>
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main class="wide">
+<h1>First 60 seconds</h1>
+<p>The Netflix performance team’s ten commands, in order, with what to look for. Run each at a one-second interval; ignore the first line of vmstat, mpstat, and iostat (averages since boot). Lessons 3 to 7 explain each.</p>
+<div class="scroll"><table><thead><tr><th>Command</th><th>USE cell</th><th>Look for</th></tr></thead><tbody>
+<tr><td><code>uptime</code></td><td>CPU demand</td><td>1 versus 15 minute load; compare with <code>nproc</code></td></tr>
+<tr><td><code>dmesg -T | tail</code></td><td>Errors, all</td><td>OOM kills, TCP drops, I/O errors</td></tr>
+<tr><td><code>vmstat 1</code></td><td>CPU S, memory S</td><td><code>r</code> above CPUs, <code>b</code> high, <code>si</code>/<code>so</code>, <code>wa</code>, <code>st</code></td></tr>
+<tr><td><code>mpstat -P ALL 1</code></td><td>CPU U</td><td>One hot CPU, steal, iowait</td></tr>
+<tr><td><code>pidstat 1</code></td><td>CPU U by process</td><td>Top consumers, rolling</td></tr>
+<tr><td><code>iostat -xz 1</code></td><td>Disk U, S</td><td><code>await</code>, queue size, throughput; <code>%util</code> is misleading on parallel devices</td></tr>
+<tr><td><code>free -m</code></td><td>Memory U</td><td><code>available</code>, not <code>free</code></td></tr>
+<tr><td><code>sar -n DEV 1</code></td><td>Network U</td><td>Rx and Tx versus link speed</td></tr>
+<tr><td><code>sar -n TCP,ETCP 1</code></td><td>Network S, E</td><td>Retransmits, connection rate</td></tr>
+<tr><td><code>top</code></td><td>Sanity check</td><td>Anything missed</td></tr>
+</tbody></table></div>
+<h2>Direct saturation signals</h2>
+<pre class="term"><code>$ cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io
+$ grep -E 'MemAvailable|SwapFree' /proc/meminfo</code></pre>
+<h2>Install before the crisis</h2>
+<p>From Brendan Gregg’s “Linux Crisis Tools” list, with Ubuntu package names (verify against <a href="https://brendangregg.com/blog/2024-03-24/linux-crisis-tools.html">the post</a>; names vary by release):</p>
+<pre class="term"><code>$ sudo apt install procps util-linux sysstat iproute2 numactl tcpdump \
+    linux-tools-common linux-tools-$(uname -r) bpfcc-tools bcc bpftrace \
+    trace-cmd nicstat ethtool tiptop cpuid msr-tools</code></pre>
+<p>Sources: <a href="https://netflixtechblog.com/linux-performance-analysis-in-60-000-milliseconds-accc10403c55">Netflix TechBlog</a>, <a href="https://brendangregg.com/blog/2024-03-24/linux-crisis-tools.html">Linux Crisis Tools</a>.</p>
+<p>Taught in <a href="../lessons/0003-first-60-seconds.html">lesson 3</a>.</p>
+</main>
+</body>
+</html>

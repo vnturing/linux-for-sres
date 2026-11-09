@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triage flows | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body>
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main class="wide">
+<h1>Triage flows</h1><p>Every diagram from the course on one page. Print it.</p><h2>The troubleshooting loop</h2><p>Lesson 1.</p><pre class="mermaid">
+flowchart LR
+  S["Symptom: what, since when, who is affected"] --> H["Rank two or three hypotheses"]
+  H --> C["Run the cheapest command that tells them apart"]
+  C --> Dq{"Did it rule something in or out?"}
+  Dq -->|yes| N["Narrow the list, or mitigate"]
+  Dq -->|no| H
+  N --> H
+</pre><h2>USE: pick a resource</h2><p>Lesson 2.</p><pre class="mermaid">
+flowchart TD
+  P["Symptom"] --> R["Pick a resource: CPU, memory, disk, network"]
+  R --> E{"Errors?"}
+  E -->|yes| X["Fault found: chase the error source"]
+  E -->|no| S{"Saturated?"}
+  S -->|yes| Y["Bottleneck suspect: find who is queued"]
+  S -->|no| U{"Utilization high?"}
+  U -->|yes| Z["Near the limit: watch for saturation"]
+  U -->|no| O["Resource exonerated: next resource"]
+  O --> R
+</pre><h2>Load is high</h2><p>Lesson 4.</p><pre class="mermaid">
+flowchart TD
+  L["Load average high versus nproc"] --> V["vmstat 1: compare r and b"]
+  V --> R{"r above the CPU count?"}
+  R -->|yes| C["CPU saturated: pidstat 1 shows who"]
+  R -->|no| B{"b high or iowait high?"}
+  B -->|yes| D["Tasks stuck in I/O: check disk and NFS"]
+  B -->|no| S{"steal high on a VM?"}
+  S -->|yes| N["Hypervisor is taking CPU: resize or move"]
+  S -->|no| W["Load was brief: check history with sar -q"]
+</pre><h2>Memory model</h2><p>Lesson 5.</p><pre class="mermaid">
+flowchart LR
+  RAM["Total RAM"] --> A["Anonymous memory: heaps and stacks, freed only by swapping or killing"]
+  RAM --> PC["Page cache: file data, reclaimable"]
+  RAM --> F["Free: unused"]
+  PC --> AV["Available is roughly free plus reclaimable cache"]
+  F --> AV
+</pre><h2>No space left on device</h2><p>Lesson 6.</p><pre class="mermaid">
+flowchart TD
+  W["No space left on device"] --> Dq{"df -h shows 100 percent?"}
+  Dq -->|no| I{"df -i shows 100 percent inodes?"}
+  I -->|yes| I2["Too many small files: find the directory"]
+  I -->|no| Q["Check quotas, a read-only remount, or a different mount"]
+  Dq -->|yes| U{"Does du -xh find the space?"}
+  U -->|yes| T["Rotate or trim the big files"]
+  U -->|no| O["lsof +L1: deleted files still held open"]
+</pre><h2>Client cannot reach service</h2><p>Lesson 7.</p><pre class="mermaid">
+flowchart TD
+  C["Client cannot reach service"] --> N{"Does the name resolve?"}
+  N -->|no| DNS["DNS or resolver: getent hosts, dig, resolv.conf"]
+  N -->|yes| K{"What does connect do?"}
+  K -->|"refused, instantly"| R["Host answered, nothing accepted: ss -tlnp, bind address, REJECT rule"]
+  K -->|"hangs, then times out"| TO["Packets vanish: firewall DROP, route, security group, host down"]
+  K -->|"connects but slow"| SL["Loss, retransmits, DNS delays, busy app: nstat, sar -n TCP,ETCP, tcpdump"]
+</pre><h2>Service unit life cycle</h2><p>Lesson 8.</p><pre class="mermaid">
+stateDiagram-v2
+  [*] --> inactive
+  inactive --> activating: start
+  activating --> active: ExecStart running
+  activating --> failed: exits or times out
+  active --> failed: crash or killed
+  failed --> activating: auto-restart
+  failed --> inactive: stop or reset-failed
+</pre><h2>Service is up but stuck</h2><p>Lesson 9.</p><pre class="mermaid">
+flowchart TD
+  H["Service is up but stuck or wrong"] --> S["ps -o stat,wchan -p PID"]
+  S --> Dq{"State D?"}
+  Dq -->|yes| K["Waiting in the kernel on I/O: iostat, dmesg, NFS"]
+  Dq -->|no| C{"Using CPU?"}
+  C -->|yes| P["Hot loop: perf top or strace -c"]
+  C -->|no| W["Blocked in a syscall: strace -f -p PID shows which"]
+</pre><h2>Log pipeline shape</h2><p>Lesson 10.</p><pre class="mermaid">
+flowchart LR
+  A["Filter: grep or an awk condition"] --> B["Extract: awk or cut a field"]
+  B --> C["Group: sort"]
+  C --> Dq["Count: uniq -c"]
+  Dq --> E["Rank: sort -rn"]
+  E --> F["Trim: head"]
+</pre><h2>Incident order of operations</h2><p>Lesson 11.</p><pre class="mermaid">
+flowchart TD
+  A["Alert or report"] --> B["Capture about 60 seconds of evidence"]
+  B --> C{"Is there a recent change to undo?"}
+  C -->|yes| Dq["Roll back"]
+  C -->|no| E["Shed load, drain, or scale"]
+  Dq --> F{"Recovered?"}
+  E --> F
+  F -->|no| G["Restart only after evidence is saved"]
+  F -->|yes| H["Diagnose from the evidence, fix, write it down"]
+  G --> F
+</pre>
+</main>
+</body>
+</html>

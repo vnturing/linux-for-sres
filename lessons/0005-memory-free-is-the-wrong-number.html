@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory: free is the wrong number | Linux for Aspiring Platform Engineers and SREs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="../assets/course.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+<script src="../assets/course.js" defer></script>
+</head>
+<body data-lesson="0005">
+<header class="bar"><a class="name" href="../index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="../index.html#map">Course map</a><a href="../index.html#reference">Reference</a></header>
+<main>
+<header class="lesson-head"><p class="module">Module 2: Read the four resources. Lesson 5 of 12. About 12 minutes.</p><h1>Memory: free is the wrong number</h1><p class="win"><strong>By the end you can:</strong> tell healthy cache use from real memory pressure, and find an OOM kill after the fact.</p><div class="use-panel" data-lit="mem.u mem.s mem.e"></div><p class="legend">U is utilization, S is saturation, E is errors. Lit lamps mark what this lesson examines.</p></header><section class="recall"><h2>Recall first</h2><p>Before new material, pull these from memory. Struggling here is useful: it is what makes the earlier lesson stick.</p><div class="quiz" data-id="r5a"><p class="q">High load with r=2 and b=14 mostly points toward…</p><ul class="opts"><li data-ok>Disk or network filesystems</li><li>A hot CPU thread</li><li>A busy hypervisor host</li><li>Severe kernel memory fragmentation</li></ul><p class="why" hidden>Blocked tasks in uninterruptible sleep, not runnable tasks, are the signature of I/O waits.</p></div></section>
+<p class="bridge">So far, CPU. The next resource is memory, where the most common mistake is reading the wrong column of <code>free</code> and panicking.</p>
+<h2>Free is not the number you want</h2>
+<p>Linux uses spare RAM as a file cache. That cache is “borrowed”: the kernel hands it back when programs need memory. So a healthy, busy server shows almost no <code>free</code> memory, by design. The kernel exposes a better figure. <code>MemAvailable</code> in <code>/proc/meminfo</code>, shown as the <code>available</code> column of <code>free</code>, is an estimate of how much memory is available for starting new applications without swapping.</p>
+<aside class="margin">Source: <a href="https://man7.org/linux/man-pages/man5/proc_meminfo.5.html">proc_meminfo(5)</a>, Linux man-pages. The field exists since Linux 3.14.</aside><pre class="term"><code>$ free -m
+               total   used   free  shared  buff/cache  available
+Mem:           15990   4210    180     120       11600      11300</code></pre><pre class="mermaid">
+flowchart LR
+  RAM["Total RAM"] --> A["Anonymous memory: heaps and stacks, freed only by swapping or killing"]
+  RAM --> PC["Page cache: file data, reclaimable"]
+  RAM --> F["Free: unused"]
+  PC --> AV["Available is roughly free plus reclaimable cache"]
+  F --> AV
+</pre>
+<p>Here <code>free</code> is 180 MB, which looks alarming, but 11 GB is available. This host is fine.</p>
+
+<h2>The three questions for memory</h2>
+<ul>
+<li><strong>Utilization:</strong> how much is genuinely in use? Look at <code>available</code> against total, not <code>free</code>.</li>
+<li><strong>Saturation:</strong> is the kernel struggling to find memory? Sustained nonzero <code>si</code> and <code>so</code> in <code>vmstat 1</code> (swap in and out) is the classic sign. <code>/proc/pressure/memory</code> gives it directly: <code>some</code> and <code>full</code> lines, where <code>full</code> means every non-idle task was stalled.</li>
+<li><strong>Errors:</strong> did the kernel give up and kill something? The OOM killer logs to the kernel log.</li>
+</ul>
+<pre class="term"><code>$ dmesg -T | grep -i -E 'out of memory|oom|killed process'
+$ journalctl -k --since "1 hour ago" | grep -i oom
+$ ps aux --sort=-rss | head -5</code></pre>
+<p>Wording of OOM messages varies across kernel versions, so search loosely. In containers and systemd services, a memory limit can kill a process inside its cgroup while the host has plenty of memory. The log line names a memory cgroup, and the service shows exit status 137 (128 plus signal 9). We return to that in lesson 8.</p>
+<div class="predict"><p class="pq"><strong>Predict first.</strong> <code>free -m</code> shows 120 MB free and 9 GB available on a 16 GB host, and swap activity is zero. Is memory the problem?</p><details><summary>Check your prediction</summary><div class="ans">No. Available memory is large and nothing is swapping. The cache is simply doing its job. Exonerate memory and move to the next resource.</div></details></div>
+<h2>Drill on a throwaway box</h2>
+<div class="drill"><h3>Watch the cache give way</h3>
+<ol><li>Run <code>free -m</code> and <code>grep -E 'MemAvailable|Cached|SwapTotal|SwapFree' /proc/meminfo</code>. Write down <code>available</code>.</li>
+<li>Read a big file: <code>cat /var/log/*.log &gt; /dev/null</code> or any large file. Run <code>free -m</code> again. Did <code>buff/cache</code> grow and <code>free</code> shrink while <code>available</code> barely moved?</li>
+<li>Only on a disposable VM, install <code>stress-ng</code> and run <code>stress-ng --vm 1 --vm-bytes 80% -t 30s</code> while watching <code>vmstat 1</code> and <code>cat /proc/pressure/memory</code>. Then <code>dmesg -T | tail</code>.</li></ol></div>
+
+<h2>Check yourself</h2>
+<div class="quiz" data-id="l5q1"><p class="q">Which free column best estimates memory for new applications?</p><ul class="opts"><li>free</li><li>buff/cache</li><li data-ok>available</li><li>shared</li></ul><p class="why" hidden>available accounts for reclaimable cache. free ignores it and so understates what is usable.</p></div><div class="quiz" data-id="l5q2"><p class="q">Sustained nonzero swap-in and swap-out in vmstat indicates what?</p><ul class="opts"><li>Healthy file cache warm-up</li><li data-ok>Memory saturation under pressure</li><li>A disk failing soon</li><li>Normal idle system behavior</li></ul><p class="why" hidden>Continuous swapping means the kernel cannot keep working memory in RAM. That is memory saturation.</p></div><section class="source"><h2>Go to the source</h2><p>If you read one thing on this topic, make it <a href="https://man7.org/linux/man-pages/man5/proc_meminfo.5.html">proc_meminfo(5), the Linux man page</a>. It defines every field in /proc/meminfo, including MemAvailable, in the kernel developers’ own words.</p><p>Compressed notes for this lesson live in the reference shelf:</p><ul><li><a href="../reference/use-matrix.html">USE matrix</a></li><li><a href="../reference/first-60-seconds.html">First-60-seconds cheat sheet</a></li></ul></section><section class="ask"><p>Something unclear, or a command output that surprised you? Ask your teacher. Paste the command and its output and ask what it tells you. That is the fastest way to build the intuition this course is after.</p></section><nav class="lnav"><span><a href="0004-load-average-is-a-queue.html">Previous: Load average is a queue, not a percentage</a></span><span><a href="0006-disk-full-slow-or-both.html">Next: Disk: full, slow, or both</a></span></nav>
+</main>
+</body>
+</html>
