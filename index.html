@@ -1,52 +1,132 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Course map | Linux for Aspiring Platform Engineers and SREs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" href="assets/course.css">
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
-<script src="assets/course.js" defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Course map | Linux for Aspiring Platform Engineers and SREs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+  <link rel="stylesheet" href="assets/course.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
+  <script src="assets/course.js" defer></script>
 </head>
+
 <body>
-<header class="bar"><a class="name" href="index.html">Linux for Aspiring Platform Engineers and SREs</a><a href="index.html#map">Course map</a><a href="index.html#reference">Reference</a></header>
-<main>
+  <header class="bar"><a class="name" href="index.html">Linux for Aspiring Platform Engineers and SREs</a><a
+      href="index.html#map">Course map</a><a href="index.html#reference">Reference</a></header>
+  <main>
 
-<header class="hero">
-<h1>Linux for Aspiring Platform Engineers and SREs</h1>
-<p class="sub">You can already install packages and fix small problems at your own pace. This course builds what comes next: reading a struggling server in its first minute, and acting on what you read while someone is waiting.</p>
-<div class="use-panel" data-lit="all" data-boot="1"></div>
-<p class="legend">Four resources, three questions each. The whole course is about learning to read this panel on a real server.</p>
-</header>
+    <header class="hero">
+      <h1>Linux for Aspiring Platform Engineers and SREs</h1>
+      <p class="sub">You can already install packages and fix small problems at your own pace. This course builds what
+        comes next: reading a struggling server in its first minute, and acting on what you read while someone is
+        waiting.</p>
+      <div class="use-panel" data-lit="all" data-boot="1"></div>
+      <p class="legend">Four resources, three questions each. The whole course is about learning to read this panel on a
+        real server.</p>
+    </header>
 
-<h2 id="how">How the course works</h2>
-<ul>
-<li><strong>Sequential.</strong> Each lesson starts from the one before it and adds one idea.</li>
-<li><strong>Short.</strong> Eight to fifteen minutes. One tangible skill per lesson.</li>
-<li><strong>Active.</strong> Every lesson has a prediction prompt, a hands-on drill, and a quiz. Every lesson after the first opens with a recall question from earlier, because retrieving something is what makes it stay.</li>
-<li><strong>Sourced.</strong> Claims link to their sources: kernel documentation, man pages, and practitioners such as Brendan Gregg, Netflix’s performance team, Google’s SRE book, and Julia Evans.</li>
-</ul>
-<p>You need a disposable Linux VM with sudo (Debian or Ubuntu family; examples use apt and systemd). Never run the drills on a production machine.</p>
+    <h2 id="how">How the course works</h2>
+    <ul>
+      <li><strong>Sequential.</strong> Each lesson starts from the one before it and adds one idea.</li>
+      <li><strong>Short.</strong> Eight to fifteen minutes. One tangible skill per lesson.</li>
+      <li><strong>Active.</strong> Every lesson has a prediction prompt, a hands-on drill, and a quiz. Every lesson
+        after the first opens with a recall question from earlier, because retrieving something is what makes it stay.
+      </li>
+      <li><strong>Sourced.</strong> Claims link to their sources: kernel documentation, man pages, and practitioners
+        such as Brendan Gregg, Netflix’s performance team, Google’s SRE book, and Julia Evans.</li>
+    </ul>
+    <p>You need a disposable Linux VM with sudo (Debian or Ubuntu family; examples use apt and systemd). Never run the
+      drills on a production machine.</p>
 
-<h2 id="map">Course map</h2>
-<pre class="mermaid">
+    <h2 id="map">Course map</h2>
+    <pre class="mermaid">
 flowchart LR
-  M1["1. Think before you type"] --> M2["2. Read the four resources"] --> M3["3. Processes and services"] --> M4["4. Work under pressure"]
-</pre><section class="mod"><h2>Module 1: Think before you type</h2><ul class="lessons"><li><span class="num">01</span><span><a data-lesson-link="0001" href="lessons/0001-start-with-the-question.html">Start with the question, not the tool</a><span class="win-line">You will write a four-line problem statement and a ranked hypothesis list before you touch the keyboard.</span></span><span class="time">8 min</span></li><li><span class="num">02</span><span><a data-lesson-link="0002" href="lessons/0002-four-resources-three-questions.html">Four resources, three questions</a><span class="win-line">You will ask utilization, saturation, and errors of each of CPU, memory, disk, and network, and say which signal is which.</span></span><span class="time">10 min</span></li><li><span class="num">03</span><span><a data-lesson-link="0003" href="lessons/0003-first-60-seconds.html">The first 60 seconds</a><span class="win-line">You will run ten standard commands on a struggling server and place each result in the USE matrix.</span></span><span class="time">12 min</span></li></ul></section><section class="mod"><h2>Module 2: Read the four resources</h2><ul class="lessons"><li><span class="num">04</span><span><a data-lesson-link="0004" href="lessons/0004-load-average-is-a-queue.html">Load average is a queue, not a percentage</a><span class="win-line">You will read a load average, decide whether the CPU, the disk, or a hypervisor is behind it, and prove it with two commands.</span></span><span class="time">12 min</span></li><li><span class="num">05</span><span><a data-lesson-link="0005" href="lessons/0005-memory-free-is-the-wrong-number.html">Memory: free is the wrong number</a><span class="win-line">You will tell healthy cache use from real memory pressure, and find an OOM kill after the fact.</span></span><span class="time">12 min</span></li><li><span class="num">06</span><span><a data-lesson-link="0006" href="lessons/0006-disk-full-slow-or-both.html">Disk: full, slow, or both</a><span class="win-line">You will diagnose “no space left on device” including the deleted-but-open-file case, and read iostat for a slow disk.</span></span><span class="time">14 min</span></li><li><span class="num">07</span><span><a data-lesson-link="0007" href="lessons/0007-network-refused-timeout-or-slow.html">Network: refused, timed out, or slow?</a><span class="win-line">You will classify a connectivity failure from one command’s behavior and pick the next check.</span></span><span class="time">14 min</span></li></ul></section><section class="mod"><h2>Module 3: Processes and services</h2><ul class="lessons"><li><span class="num">08</span><span><a data-lesson-link="0008" href="lessons/0008-systemd-first-responder.html">Services: systemd is your first responder</a><span class="win-line">You will take a failing or flapping service from “it’s down” to an exit status and a log line in under two minutes.</span></span><span class="time">14 min</span></li><li><span class="num">09</span><span><a data-lesson-link="0009" href="lessons/0009-seeing-inside-a-process.html">Seeing inside a process</a><span class="win-line">You will tell a stuck process from a busy one, spot a file-descriptor leak, and read a strace line.</span></span><span class="time">14 min</span></li></ul></section><section class="mod"><h2>Module 4: Work under pressure</h2><ul class="lessons"><li><span class="num">10</span><span><a data-lesson-link="0010" href="lessons/0010-shell-speed-slice-logs.html">Shell speed: slice logs in seconds</a><span class="win-line">You will turn a raw log into a ranked answer with one pipeline, and move around a terminal without reaching for the mouse.</span></span><span class="time">15 min</span></li><li><span class="num">11</span><span><a data-lesson-link="0011" href="lessons/0011-mitigate-first-diagnose-second.html">Mitigate first, diagnose second</a><span class="win-line">You will choose a reversible mitigation, capture evidence before changing anything, and keep a timeline.</span></span><span class="time">14 min</span></li><li><span class="num">12</span><span><a data-lesson-link="0012" href="lessons/0012-capstone-practice-plan.html">Capstone: practice under the clock</a><span class="win-line">You will run timed troubleshooting scenarios, log them in a reusable format, and schedule the review that makes the skills stick.</span></span><span class="time">15 min</span></li></ul></section>
-<h2 id="reference">Reference shelf</h2>
-<p>The compressed essence of the lessons, designed to print on one or two pages.</p>
-<ul class="refs">
-<li><a href="reference/first-60-seconds.html">First 60 seconds cheat sheet</a></li>
-<li><a href="reference/use-matrix.html">USE matrix</a></li>
-<li><a href="reference/triage-flows.html">Triage flows</a></li>
-<li><a href="reference/glossary.html">Glossary</a></li>
-</ul>
-<h2 id="after">After the course</h2>
-<p>Lesson 12 sets up timed practice on <a href="https://sadservers.com/">SadServers</a> and points to communities where practitioners trade incident stories. Ticks on this page are saved only in your own browser.</p>
+  M1["Module 1: Think before you type"] --> M2["Module 2: Read the four resources"] --> M3["Module 3: Processes and services"] --> M4["Module 4: Work under pressure"]
+</pre>
+    <section class="mod">
+      <h2>Module 1: Think before you type</h2>
+      <ul class="lessons">
+        <li><span class="num">01</span><span><a data-lesson-link="0001"
+              href="lessons/0001-start-with-the-question.html">Start with the question, not the tool</a><span
+              class="win-line">You will write a four-line problem statement and a ranked hypothesis list before you
+              touch the keyboard.</span></span><span class="time">8 min</span></li>
+        <li><span class="num">02</span><span><a data-lesson-link="0002"
+              href="lessons/0002-four-resources-three-questions.html">Four resources, three questions</a><span
+              class="win-line">You will ask utilization, saturation, and errors of each of CPU, memory, disk, and
+              network, and say which signal is which.</span></span><span class="time">10 min</span></li>
+        <li><span class="num">03</span><span><a data-lesson-link="0003" href="lessons/0003-first-60-seconds.html">The
+              first 60 seconds</a><span class="win-line">You will run ten standard commands on a struggling server and
+              place each result in the USE matrix.</span></span><span class="time">12 min</span></li>
+      </ul>
+    </section>
+    <section class="mod">
+      <h2>Module 2: Read the four resources</h2>
+      <ul class="lessons">
+        <li><span class="num">04</span><span><a data-lesson-link="0004"
+              href="lessons/0004-load-average-is-a-queue.html">Load average is a queue, not a percentage</a><span
+              class="win-line">You will read a load average, decide whether the CPU, the disk, or a hypervisor is behind
+              it, and prove it with two commands.</span></span><span class="time">12 min</span></li>
+        <li><span class="num">05</span><span><a data-lesson-link="0005"
+              href="lessons/0005-memory-free-is-the-wrong-number.html">Memory: free is the wrong number</a><span
+              class="win-line">You will tell healthy cache use from real memory pressure, and find an OOM kill after the
+              fact.</span></span><span class="time">12 min</span></li>
+        <li><span class="num">06</span><span><a data-lesson-link="0006"
+              href="lessons/0006-disk-full-slow-or-both.html">Disk: full, slow, or both</a><span class="win-line">You
+              will diagnose “no space left on device” including the deleted-but-open-file case, and read iostat for a
+              slow disk.</span></span><span class="time">14 min</span></li>
+        <li><span class="num">07</span><span><a data-lesson-link="0007"
+              href="lessons/0007-network-refused-timeout-or-slow.html">Network: refused, timed out, or slow?</a><span
+              class="win-line">You will classify a connectivity failure from one command’s behavior and pick the next
+              check.</span></span><span class="time">14 min</span></li>
+      </ul>
+    </section>
+    <section class="mod">
+      <h2>Module 3: Processes and services</h2>
+      <ul class="lessons">
+        <li><span class="num">08</span><span><a data-lesson-link="0008"
+              href="lessons/0008-systemd-first-responder.html">Services: systemd is your first responder</a><span
+              class="win-line">You will take a failing or flapping service from “it’s down” to an exit status and a log
+              line in under two minutes.</span></span><span class="time">14 min</span></li>
+        <li><span class="num">09</span><span><a data-lesson-link="0009"
+              href="lessons/0009-seeing-inside-a-process.html">Seeing inside a process</a><span class="win-line">You
+              will tell a stuck process from a busy one, spot a file-descriptor leak, and read a strace
+              line.</span></span><span class="time">14 min</span></li>
+      </ul>
+    </section>
+    <section class="mod">
+      <h2>Module 4: Work under pressure</h2>
+      <ul class="lessons">
+        <li><span class="num">10</span><span><a data-lesson-link="0010"
+              href="lessons/0010-shell-speed-slice-logs.html">Shell speed: slice logs in seconds</a><span
+              class="win-line">You will turn a raw log into a ranked answer with one pipeline, and move around a
+              terminal without reaching for the mouse.</span></span><span class="time">15 min</span></li>
+        <li><span class="num">11</span><span><a data-lesson-link="0011"
+              href="lessons/0011-mitigate-first-diagnose-second.html">Mitigate first, diagnose second</a><span
+              class="win-line">You will choose a reversible mitigation, capture evidence before changing anything, and
+              keep a timeline.</span></span><span class="time">14 min</span></li>
+        <li><span class="num">12</span><span><a data-lesson-link="0012"
+              href="lessons/0012-capstone-practice-plan.html">Capstone: practice under the clock</a><span
+              class="win-line">You will run timed troubleshooting scenarios, log them in a reusable format, and schedule
+              the review that makes the skills stick.</span></span><span class="time">15 min</span></li>
+      </ul>
+    </section>
+    <h2 id="reference">Reference shelf</h2>
+    <p>The compressed essence of the lessons, designed to print on one or two pages.</p>
+    <ul class="refs">
+      <li><a href="reference/first-60-seconds.html">First 60 seconds cheat sheet</a></li>
+      <li><a href="reference/use-matrix.html">USE matrix</a></li>
+      <li><a href="reference/triage-flows.html">Triage flows</a></li>
+      <li><a href="reference/glossary.html">Glossary</a></li>
+    </ul>
+    <h2 id="after">After the course</h2>
+    <p>Lesson 12 sets up timed practice on <a href="https://sadservers.com/">SadServers</a> and points to communities
+      where practitioners trade incident stories. Ticks on this page are saved only in your own browser.</p>
 
-</main>
+  </main>
 </body>
+
 </html>
